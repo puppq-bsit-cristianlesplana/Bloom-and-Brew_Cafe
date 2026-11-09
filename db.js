@@ -1,87 +1,72 @@
 /* ===========================================================================
-   BLOOM & BREW CAFÉ — DATABASE LAYER (IndexedDB)
+   BLOOM & BREW CAFÉ — DATABASE LAYER (MySQL via PHP API)
+   All data lives in the MySQL database "bloom_brew_pos" (see database/schema.sql).
+   The browser talks to it through api/store.php and api/login.php.
    =========================================================================== */
 
-const DB_NAME = "bloo_brew_pos";
-const DB_VERSION = 9;
-const DB_VERSION_KEY = "bloo_brew_db_version";
-let dbInstance = null;
+const API_BASE = "api/";
 
-// Auto-clear stale database when version changes
-(function autoReset() {
-  const stored = localStorage.getItem(DB_VERSION_KEY);
-  if (stored && parseInt(stored, 10) !== DB_VERSION) {
-    indexedDB.deleteDatabase(DB_NAME);
+async function apiRequest(path, options) {
+  let res;
+  try {
+    res = await fetch(API_BASE + path, options);
+  } catch (err) {
+    throw new Error("Cannot reach the server. Start it with start-server.bat (see README).");
   }
-  localStorage.setItem(DB_VERSION_KEY, DB_VERSION);
-})();
-
-function openDB() {
-  return new Promise((resolve, reject) => {
-    if (dbInstance) return resolve(dbInstance);
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-
-    req.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      for (const name of db.objectStoreNames) {
-        db.deleteObjectStore(name);
-      }
-      db.createObjectStore("menuItems", { keyPath: "id" });
-      db.createObjectStore("inventory", { keyPath: "name" });
-      const orderStore = db.createObjectStore("orders", { keyPath: "id" });
-      orderStore.createIndex("status", "status", { unique: false });
-      db.createObjectStore("approvals", { keyPath: "id" });
-      db.createObjectStore("meta", { keyPath: "key" });
-    };
-
-    req.onsuccess = (event) => {
-      dbInstance = event.target.result;
-      resolve(dbInstance);
-    };
-    req.onerror = () => reject(req.error);
-  });
+  let data = null;
+  try {
+    data = await res.json();
+  } catch (err) {
+    throw new Error("Server returned an invalid response (HTTP " + res.status + "). Is PHP running?");
+  }
+  if (!res.ok) {
+    const e = new Error((data && data.error) || "Request failed (HTTP " + res.status + ")");
+    e.status = res.status;
+    throw e;
+  }
+  return data;
 }
 
-function tx(storeName, mode = "readonly") {
-  return openDB().then((db) => db.transaction(storeName, mode).objectStore(storeName));
+function storeGet(store, key) {
+  let url = "store.php?store=" + encodeURIComponent(store);
+  if (key !== undefined) url += "&key=" + encodeURIComponent(key);
+  return apiRequest(url, { method: "GET" });
 }
 
-function promisify(request) {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+function storePost(store, body) {
+  return apiRequest("store.php?store=" + encodeURIComponent(store), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
 }
 
 const DB = {
-  async getAll(store) {
-    const s = await tx(store);
-    return promisify(s.getAll());
-  },
-  async get(store, key) {
-    const s = await tx(store);
-    return promisify(s.get(key));
-  },
-  async put(store, value) {
-    const s = await tx(store, "readwrite");
-    return promisify(s.put(value));
-  },
-  async putAll(store, values) {
-    const s = await tx(store, "readwrite");
-    values.forEach((v) => s.put(v));
-    return new Promise((resolve) => {
-      s.transaction.oncomplete = () => resolve();
-    });
-  },
-  async delete(store, key) {
-    const s = await tx(store, "readwrite");
-    return promisify(s.delete(key));
-  },
-  async clear(store) {
-    const s = await tx(store, "readwrite");
-    return promisify(s.clear());
-  },
+  getAll(store) { return storeGet(store); },
+  get(store, key) { return storeGet(store, key); },
+  put(store, value) { return storePost(store, { action: "put", value }); },
+  putAll(store, values) { return storePost(store, { action: "putAll", values }); },
+  delete(store, key) { return storePost(store, { action: "delete", key }); },
+  clear(store) { return storePost(store, { action: "clear" }); },
 };
+
+// ---------------------------------------------------------------------------
+// Staff login — checked against the MySQL "users" table (bcrypt passwords).
+// Resolves to {username, name, role} or null when the credentials are wrong.
+// ---------------------------------------------------------------------------
+async function loginStaff(username, password) {
+  try {
+    const data = await apiRequest("login.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    return data.user;
+  } catch (err) {
+    if (err.status === 401) return null;
+    throw err;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Seed data
@@ -230,7 +215,7 @@ async function deductInventoryForOrder(orderLines, menuById) {
   return lowNow;
 }
 
-async function createOrder({ items, subtotal, tax, total, payment, tableLabel, orderType }) {
+async function createOrder({ items, subtotal, tax, total, payment, tableLabel, orderType, cashier }) {
   const id = await nextOrderId();
   const order = {
     id,
@@ -239,6 +224,7 @@ async function createOrder({ items, subtotal, tax, total, payment, tableLabel, o
     payment,
     table: tableLabel || "Walk-in",
     orderType: orderType || "Dine In",
+    cashier: cashier || "",
     status: "sent_to_kitchen",
     createdAt: new Date().toISOString(),
     timeLabel: new Date().toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }),

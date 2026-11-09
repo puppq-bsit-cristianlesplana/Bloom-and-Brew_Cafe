@@ -574,6 +574,72 @@ body {
 .cart-hint { font-size: 12px; color: var(--text-tertiary); text-align: center; margin: 10px 0 0; }
 
 /* ---------------------------------------------------------------------
+   LOGIN PAGE
+   --------------------------------------------------------------------- */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 140, 60, 0.25), transparent 60%),
+    radial-gradient(circle at center, rgba(255, 249, 145, 0.45), transparent 70%),
+    #ffffff;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(74,124,89,0.15);
+  border-radius: var(--radius-lg);
+  padding: 28px 26px;
+  box-shadow: 0 20px 50px rgba(26,34,56,0.15);
+  display: flex;
+  flex-direction: column;
+}
+
+.login-logo {
+  width: 180px;
+  max-width: 70%;
+  height: auto;
+  margin: 0 auto 6px;
+  display: block;
+}
+
+.login-title { font-size: 20px; margin: 4px 0 2px; text-align: center; color: var(--navy); }
+.login-sub { font-size: 13px; margin: 0 0 10px; text-align: center; color: var(--text-secondary); }
+
+.login-input {
+  width: 100%;
+  font-size: 15px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: #fff;
+}
+.login-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+
+.login-password-wrap { position: relative; }
+.login-password-wrap .login-input { padding-right: 64px; }
+.login-toggle {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--accent);
+  font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 8px;
+}
+
+.login-submit { width: 100%; margin-top: 6px; }
+
+.login-back {
+  margin-top: 12px;
+  background: none; border: none;
+  color: var(--text-secondary); font-size: 13px; cursor: pointer;
+}
+.login-back:hover { color: var(--navy); text-decoration: underline; }
+
+/* ---------------------------------------------------------------------
    CASH PAYMENT MODAL
    --------------------------------------------------------------------- */
 .modal-overlay {

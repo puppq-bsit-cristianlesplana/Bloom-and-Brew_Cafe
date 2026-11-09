@@ -44,24 +44,133 @@ const bootPromise = (async function boot() {
     await autoSelectNextTable();
     bootDone = true;
 
-    if (sessionStorage.getItem("posActive") === "true") {
-      document.getElementById("landing-page").classList.add("hidden");
-      document.getElementById("pos-app").classList.remove("hidden");
-      var savedPage = sessionStorage.getItem("currentPage") || "orders";
-      showPage(savedPage);
+    if (currentUser && sessionStorage.getItem("posActive") === "true") {
+      showPOS(sessionStorage.getItem("currentPage") || "orders");
     }
   } catch (err) {
     console.error("Boot failed:", err);
+    alert("Could not load data from the MySQL database.\n\n" + err.message);
   }
 })();
+
+// --- Session / logged-in user -----------------------------------------------
+var currentUser = loadSessionUser();
+
+function loadSessionUser() {
+  try {
+    var raw = sessionStorage.getItem("posUser");
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getInitials(name) {
+  return String(name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(function (w) { return w[0].toUpperCase(); })
+    .join("");
+}
+
+function escapeHtml(str) {
+  return String(str == null ? "" : str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function shortName(name) {
+  var parts = String(name || "").split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return parts[0] || "";
+  return parts[0] + " " + parts[parts.length - 1][0] + ".";
+}
+
+function renderCurrentUser() {
+  if (!currentUser) return;
+  var initials = getInitials(currentUser.name);
+  document.getElementById("sidebar-user-avatar").textContent = initials;
+  document.getElementById("sidebar-user-name").textContent = currentUser.name;
+  document.getElementById("sidebar-user-role").textContent = currentUser.role;
+  document.getElementById("exit-user-avatar").textContent = initials;
+  document.getElementById("exit-user-name").textContent = currentUser.name;
+  document.getElementById("exit-user-role").textContent = currentUser.role;
+}
+
+function showPOS(page) {
+  renderCurrentUser();
+  document.getElementById("landing-page").classList.add("hidden");
+  document.getElementById("login-page").classList.add("hidden");
+  document.getElementById("pos-app").classList.remove("hidden");
+  sessionStorage.setItem("posActive", "true");
+  showPage(page || "orders");
+}
+
+function showLogin() {
+  document.getElementById("landing-page").classList.add("hidden");
+  document.getElementById("pos-app").classList.add("hidden");
+  document.getElementById("login-page").classList.remove("hidden");
+  document.getElementById("login-error").textContent = "";
+  document.getElementById("login-form").reset();
+  document.getElementById("login-username").focus();
+}
 
 // --- Landing page -----------------------------------------------------------
 document.getElementById("enter-pos-btn").addEventListener("click", async () => {
   if (!bootDone) await bootPromise;
-  document.getElementById("landing-page").classList.add("hidden");
-  document.getElementById("pos-app").classList.remove("hidden");
-  sessionStorage.setItem("posActive", "true");
-  showPage("orders");
+  if (currentUser) {
+    showPOS("orders");
+  } else {
+    showLogin();
+  }
+});
+
+// --- Login page -------------------------------------------------------------
+document.getElementById("login-form").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  var username = document.getElementById("login-username").value;
+  var password = document.getElementById("login-password").value;
+  var errorEl = document.getElementById("login-error");
+
+  if (!username.trim() || !password) {
+    errorEl.textContent = "Please enter your username and password.";
+    return;
+  }
+
+  var user;
+  try {
+    user = await loginStaff(username, password);
+  } catch (err) {
+    errorEl.textContent = err.message;
+    return;
+  }
+  if (!user) {
+    errorEl.textContent = "Incorrect username or password.";
+    document.getElementById("login-password").value = "";
+    document.getElementById("login-password").focus();
+    return;
+  }
+
+  if (!bootDone) await bootPromise;
+  currentUser = user;
+  sessionStorage.setItem("posUser", JSON.stringify(user));
+  showPOS("orders");
+});
+
+document.getElementById("login-toggle").addEventListener("click", function () {
+  var input = document.getElementById("login-password");
+  var show = input.type === "password";
+  input.type = show ? "text" : "password";
+  this.textContent = show ? "Hide" : "Show";
+  this.setAttribute("aria-label", show ? "Hide password" : "Show password");
+});
+
+document.getElementById("login-back").addEventListener("click", function () {
+  document.getElementById("login-page").classList.add("hidden");
+  document.getElementById("landing-page").classList.remove("hidden");
 });
 
 // --- Order type (Dine In / Take Out) -----------------------------------------
@@ -191,10 +300,12 @@ exitModal.addEventListener("click", (e) => {
 
 document.getElementById("exit-btn").addEventListener("click", () => {
   exitModal.classList.remove("visible");
-  document.getElementById("pos-app").classList.add("hidden");
-  document.getElementById("landing-page").classList.remove("hidden");
+  closeSidebar();
+  currentUser = null;
+  sessionStorage.removeItem("posUser");
   sessionStorage.removeItem("posActive");
   sessionStorage.removeItem("currentPage");
+  showLogin();
 });
 
 function updateTaxLabels() {
@@ -536,6 +647,7 @@ document.getElementById("confirm-payment-btn").addEventListener("click", async (
     payment: { method: "Cash", tendered, change },
     tableLabel: tLabel,
     orderType: orderType,
+    cashier: currentUser ? currentUser.name : "",
   });
 
   await deductInventoryForOrder(order.items, menuById);
@@ -678,7 +790,7 @@ async function renderKitchen() {
         '<div class="kitchen-card-meta">' + tableTag + typeTag + '</div>' +
         timerHtml +
         '<ul class="kitchen-card-items">' + itemsHtml + '</ul>' +
-        '<div class="kitchen-card-customer">Cashier: Nicole M.</div>' +
+        '<div class="kitchen-card-customer">Cashier: ' + escapeHtml(shortName(o.cashier) || "—") + '</div>' +
         actionHtml;
       card.querySelectorAll("button[data-order]").forEach((btn) => {
         btn.addEventListener("click", async (e) => {
@@ -1260,7 +1372,7 @@ document.getElementById("print-order-btn").addEventListener("click", async funct
     '<p class="sub">Official Receipt</p><hr>' +
     '<p>Order: <b>#' + order.id + '</b></p>' +
     '<p>' + (order.orderType || "Dine In") + ' · ' + order.table + ' · ' + new Date(order.createdAt).toLocaleString("en-PH") + '</p>' +
-    '<p>Cashier: Nicole Melican</p><hr>' +
+    '<p>Cashier: ' + escapeHtml(order.cashier || "—") + '</p><hr>' +
     '<table>';
   order.items.forEach(function (item) {
     html += '<tr><td>' + item.name + ' x' + item.qty + '</td><td class="r">₱' + (item.price * item.qty).toFixed(2) + '</td></tr>';

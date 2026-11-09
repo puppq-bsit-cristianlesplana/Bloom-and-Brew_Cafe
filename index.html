@@ -52,7 +52,32 @@
   </div>
 
   <!-- ===================================================================
-       POS SYSTEM (hidden until Enter POS is clicked)
+       LOGIN PAGE (shown after Enter POS System)
+       =================================================================== -->
+  <div class="login-page hidden" id="login-page">
+    <form class="login-card" id="login-form" novalidate>
+      <img src="images/logo.png" alt="Bloom and Brew Cafe" class="login-logo">
+      <h1 class="login-title">Staff Login</h1>
+      <p class="login-sub">Sign in to start your shift.</p>
+
+      <label class="modal-label" for="login-username">Username</label>
+      <input type="text" id="login-username" class="login-input" autocomplete="username" placeholder="e.g. nicole" required>
+
+      <label class="modal-label" for="login-password">Password</label>
+      <div class="login-password-wrap">
+        <input type="password" id="login-password" class="login-input" autocomplete="current-password" placeholder="Enter your password" required>
+        <button type="button" class="login-toggle" id="login-toggle" aria-label="Show password">Show</button>
+      </div>
+
+      <p class="modal-error" id="login-error" role="alert"></p>
+
+      <button type="submit" class="landing-btn login-submit">Log In</button>
+      <button type="button" class="login-back" id="login-back">&larr; Back to Home</button>
+    </form>
+  </div>
+
+  <!-- ===================================================================
+       POS SYSTEM (hidden until the user logs in)
        =================================================================== -->
   <div class="app-shell hidden" id="pos-app">
 
@@ -105,10 +130,10 @@
       </nav>
 
       <button class="sidebar-user" id="user-btn" type="button">
-        <span class="user-avatar">NM</span>
+        <span class="user-avatar" id="sidebar-user-avatar"></span>
         <div class="user-text">
-          <span class="user-name">Nicole Melican</span>
-          <span class="user-role">Cashier</span>
+          <span class="user-name" id="sidebar-user-name"></span>
+          <span class="user-role" id="sidebar-user-role"></span>
         </div>
         <span class="user-caret">⌄</span>
       </button>
@@ -117,10 +142,10 @@
     <!-- EXIT MODAL -->
     <div class="modal-overlay" id="exit-modal">
       <div class="modal-card exit-modal-card">
-        <div class="exit-modal-avatar">NM</div>
-        <h2 class="exit-modal-name">Nicole Melican</h2>
-        <p class="exit-modal-role">Cashier</p>
-        <button class="btn btn-danger-solid" id="exit-btn" type="button">Exit to Home</button>
+        <div class="exit-modal-avatar" id="exit-user-avatar"></div>
+        <h2 class="exit-modal-name" id="exit-user-name"></h2>
+        <p class="exit-modal-role" id="exit-user-role"></p>
+        <button class="btn btn-danger-solid" id="exit-btn" type="button">Log Out</button>
         <button class="btn btn-outline exit-modal-cancel" id="exit-cancel-btn" type="button">Cancel</button>
       </div>
     </div>

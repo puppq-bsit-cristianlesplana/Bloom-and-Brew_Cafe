@@ -1,8 +1,6 @@
 # Bloom and Brew Cafe — POS System
 
-A fully functional cafe point-of-sale and restaurant management system built with **HTML, CSS, and JavaScript only** — no framework, no build step, no external server. Uses the browser's built-in IndexedDB for persistent data storage that survives page reloads.
-
-Live demo via GitHub Pages or open `index.html` directly in any modern browser.
+A fully functional cafe point-of-sale and restaurant management system built with **HTML, CSS and JavaScript** on the front end, a small **PHP API**, and a **MySQL (MariaDB) database**. Staff sign in on a login page before using the POS.
 
 ---
 
@@ -12,7 +10,10 @@ Live demo via GitHub Pages or open `index.html` directly in any modern browser.
 |--------------|---------|
 | `index.html` | Complete UI markup — landing page, sidebar, all 6 modules, and all modals |
 | `style.css`  | All styling — responsive design, sidebar, cards, modals, gradients |
-| `db.js`      | Database layer — schema, seed data, CRUD helpers, and business logic |
+| `db.js`      | Data layer — calls the PHP API, seed data, and business logic |
+| `api/`       | PHP API — `store.php` (reads/writes the tables), `login.php` (staff login), `config.php` (MySQL connection settings) |
+| `database/schema.sql` | Creates the `bloom_brew_pos` database, its tables, and the default staff accounts |
+| `start-server.bat` | Starts the local PHP server at http://localhost:8000 |
 | `script.js`  | Application logic — navigation, cart, checkout, rendering, and all feature handlers |
 | `images/`    | Product photos, logo, favicon, and SVG icons |
 
@@ -118,15 +119,16 @@ The POS implements a complete order-to-kitchen-to-inventory workflow:
 
 ## Database Schema
 
-Five IndexedDB object stores:
+MySQL database `bloom_brew_pos` with six tables (defined in `database/schema.sql`):
 
-| Store        | Key    | Contents |
+| Table        | Key    | Contents |
 |--------------|--------|----------|
-| `menuItems`  | `id`   | Name, price, category, image path, and ingredient usage per item |
+| `users`      | `username` | Staff login accounts — bcrypt password hash, name, role |
+| `menu_items` | `id`   | Name, price, category, image path, and ingredient usage per item |
 | `inventory`  | `name` | Stock level, unit, category, and low-stock threshold per ingredient |
-| `orders`     | `id`   | Items, totals, payment info, order type, table, status, timestamps |
+| `orders`     | `id`   | Items, totals, payment info, order type, table, cashier, status, timestamps |
 | `approvals`  | `id`   | Low-stock/out-of-stock alerts and their approval status |
-| `meta`       | `key`  | System settings — order counter, tax rate, seeded flag, DB version |
+| `meta`       | `key`  | System settings — order counter, tax rate, seeded flag |
 
 ### Key Database Functions
 - `seedIfEmpty()` — Seeds menu, inventory, tax rate, and order counter on first run
@@ -214,10 +216,22 @@ Held orders use `localStorage` so they persist even after closing the browser.
 
 ## Running the System
 
-1. Open `index.html` in any modern browser, OR
-2. Enable **GitHub Pages** on the repo (Settings > Pages > Branch: `main` / Folder: `/ (root)`)
+Requires **XAMPP** (PHP + MySQL).
 
-No setup, no server, no installation — IndexedDB and localStorage are built into every modern browser.
+1. Open the **XAMPP Control Panel** and start **MySQL**.
+2. Create the database — in phpMyAdmin (http://localhost/phpmyadmin) use the **Import** tab on `database/schema.sql`, or run:
+   `C:\xampp\mysql\bin\mysql.exe -u root < database\schema.sql`
+3. Double-click **`start-server.bat`** and open **http://localhost:8000**.
+4. Log in with a default account:
+
+| Username  | Password     | Role    |
+|-----------|--------------|---------|
+| `nicole`  | `cashier123` | Cashier |
+| `manager` | `manager123` | Manager |
+
+Menu items, inventory and settings are seeded automatically the first time the app loads. MySQL connection settings are in `api/config.php`.
+
+Opening `index.html` directly (or via GitHub Pages) no longer works — the page needs the PHP server to reach MySQL.
 
 ---
 
@@ -227,16 +241,12 @@ No setup, no server, no installation — IndexedDB and localStorage are built in
 - "Reset Stock" — Restores inventory to defaults; keeps orders and prices
 - "Reset All" — Full factory reset to original state
 
-**Automatic:**
-- Database auto-resets when `DB_VERSION` is bumped in `db.js`
-
 ---
 
 ## Known Limitations
 
 - Cash is the only payment method (by design for this POS scope)
-- No login/authentication — cashier name is configurable but static
-- Data is local to the browser — not synced between devices
-- Held orders use localStorage, not IndexedDB
+- The login only gates the screen — the PHP API itself does not check who is signed in
+- Held orders use localStorage (per browser), not MySQL
 - Dine-in timer is set to 3 minutes for demo purposes (configurable in code)
 - No receipt printing to physical thermal printers (browser print only)
