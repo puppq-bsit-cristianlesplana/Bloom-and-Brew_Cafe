@@ -648,6 +648,7 @@ document.getElementById("confirm-payment-btn").addEventListener("click", async (
     tableLabel: tLabel,
     orderType: orderType,
     cashier: currentUser ? currentUser.name : "",
+    cashierUsername: currentUser ? currentUser.username : null,
   });
 
   await deductInventoryForOrder(order.items, menuById);
@@ -901,7 +902,7 @@ async function renderApprovals() {
       const approveBtn = card.querySelector("[data-approve]");
       if (approveBtn) {
         approveBtn.addEventListener("click", async () => {
-          await approveRestock(a.id);
+          await approveRestock(a.id, currentUser ? currentUser.username : null);
           renderApprovals();
           renderInventory();
           renderMenu();

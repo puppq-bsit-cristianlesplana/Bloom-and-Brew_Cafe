@@ -119,16 +119,28 @@ The POS implements a complete order-to-kitchen-to-inventory workflow:
 
 ## Database Schema
 
-MySQL database `bloom_brew_pos` with six tables (defined in `database/schema.sql`):
+MySQL database `bloom_brew_pos`, designed in **Third Normal Form (3NF)** (defined in `database/schema.sql`):
 
-| Table        | Key    | Contents |
-|--------------|--------|----------|
-| `users`      | `username` | Staff login accounts — bcrypt password hash, name, role |
-| `menu_items` | `id`   | Name, price, category, image path, and ingredient usage per item |
-| `inventory`  | `name` | Stock level, unit, category, and low-stock threshold per ingredient |
-| `orders`     | `id`   | Items, totals, payment info, order type, table, cashier, status, timestamps |
-| `approvals`  | `id`   | Low-stock/out-of-stock alerts and their approval status |
-| `meta`       | `key`  | System settings — order counter, tax rate, seeded flag |
+| Table | Primary key | Contents |
+|-------|-------------|----------|
+| `users` | `user_id` | Staff login accounts — username, bcrypt password hash, full name, role |
+| `menu_categories` | `category_id` | Coffee, Ice Shaken, Non-Coffee, Snacks |
+| `menu_items` | `menu_item_id` | Name, price, image, daily limit → `menu_categories` |
+| `ingredient_categories` | `category_id` | Dairy, Syrup, Sauce, Pastry, … |
+| `ingredients` | `ingredient_id` | Stock level, unit, low-stock threshold → `ingredient_categories` |
+| `menu_item_ingredients` | (`menu_item_id`, `ingredient_id`) | Recipe — quantity of each ingredient used per serving |
+| `orders` | `order_id` | Order type, table, status, tax charged, time → cashier in `users` |
+| `order_items` | `order_item_id` | One row per product line — menu item, Iced/Hot variant, qty, price at time of sale |
+| `payments` | `payment_id` | Payment method and amount tendered (one per order) |
+| `restock_approvals` | `approval_id` | Low/out-of-stock alerts → `ingredients`; approved by → `users` |
+| `settings` | `setting_key` | Tax rate, order counter, seeded flag |
+
+**Why it is 3NF**
+- **1NF** — every column holds one value; order lines, recipes and payments are their own tables (no lists or JSON).
+- **2NF** — the only composite key is in `menu_item_ingredients`, and `qty_used` depends on both parts of it.
+- **3NF** — no non-key column depends on another non-key column. Values that can be calculated are not stored:
+  subtotal, total and change come from the view `v_order_totals`; an alert's type (low/out) and unit, and every
+  name shown for a cashier, category or ingredient, are read through foreign keys.
 
 ### Key Database Functions
 - `seedIfEmpty()` — Seeds menu, inventory, tax rate, and order counter on first run

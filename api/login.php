@@ -12,7 +12,7 @@ if ($username === '' || $password === '') {
     json_out(['error' => 'Please enter your username and password.'], 400);
 }
 
-$stmt = db()->prepare('SELECT username, password_hash, name, role FROM users WHERE username = ?');
+$stmt = db()->prepare('SELECT username, password_hash, full_name, role FROM users WHERE username = ?');
 $stmt->execute([$username]);
 $row = $stmt->fetch();
 
@@ -20,4 +20,4 @@ if (!$row || !password_verify($password, $row['password_hash'])) {
     json_out(['error' => 'Incorrect username or password.'], 401);
 }
 
-json_out(['user' => ['username' => $row['username'], 'name' => $row['name'], 'role' => $row['role']]]);
+json_out(['user' => ['username' => $row['username'], 'name' => $row['full_name'], 'role' => $row['role']]]);

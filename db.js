@@ -148,8 +148,9 @@ async function seedIfEmpty() {
   const metaRow = await DB.get("meta", "seeded");
   if (metaRow && metaRow.value) return;
 
-  await DB.putAll("menuItems", SEED_MENU);
+  // Ingredients first — menu recipes reference them by foreign key
   await DB.putAll("inventory", SEED_INVENTORY);
+  await DB.putAll("menuItems", SEED_MENU);
   await DB.put("meta", { key: "seeded", value: true });
   await DB.put("meta", { key: "orderCounter", value: 10023 });
   await DB.put("meta", { key: "taxRate", value: DEFAULT_TAX_RATE });
@@ -163,17 +164,24 @@ async function nextOrderId() {
 }
 
 async function resetDatabase() {
-  await DB.clear("menuItems");
-  await DB.clear("inventory");
+  // Order matters: child rows must go before the rows they reference
   await DB.clear("orders");
   await DB.clear("approvals");
+  await DB.clear("menuItems");
+  await DB.clear("inventory");
   await DB.clear("meta");
   await seedIfEmpty();
 }
 
 async function resetStockOnly() {
-  await DB.clear("inventory");
   await DB.clear("approvals");
+  // Remove ingredients added by staff, then restore the default stock levels.
+  // (Default ingredients are updated in place because menu recipes reference them.)
+  const seedNames = new Set(SEED_INVENTORY.map((i) => i.name));
+  const current = await DB.getAll("inventory");
+  for (const row of current) {
+    if (!seedNames.has(row.name)) await DB.delete("inventory", row.name);
+  }
   await DB.putAll("inventory", SEED_INVENTORY);
 }
 
@@ -207,7 +215,7 @@ async function deductInventoryForOrder(orderLines, menuById) {
       ingredient: ingName,
       stock: row.stock,
       unit: row.unit,
-      time: new Date().toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }),
+      createdAt: new Date().toISOString(),
       status: "needed",
     });
   }
@@ -215,7 +223,7 @@ async function deductInventoryForOrder(orderLines, menuById) {
   return lowNow;
 }
 
-async function createOrder({ items, subtotal, tax, total, payment, tableLabel, orderType, cashier }) {
+async function createOrder({ items, subtotal, tax, total, payment, tableLabel, orderType, cashier, cashierUsername }) {
   const id = await nextOrderId();
   const order = {
     id,
@@ -225,6 +233,7 @@ async function createOrder({ items, subtotal, tax, total, payment, tableLabel, o
     table: tableLabel || "Walk-in",
     orderType: orderType || "Dine In",
     cashier: cashier || "",
+    cashierUsername: cashierUsername || null,
     status: "sent_to_kitchen",
     createdAt: new Date().toISOString(),
     timeLabel: new Date().toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }),
@@ -241,11 +250,12 @@ async function updateOrderStatus(orderId, status) {
   return order;
 }
 
-async function approveRestock(alertId) {
+async function approveRestock(alertId, approvedByUsername) {
   const alert = await DB.get("approvals", alertId);
   if (!alert) return;
   alert.status = "approved";
-  alert.approvedAt = new Date().toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  alert.approvedAtIso = new Date().toISOString();
+  alert.approvedByUsername = approvedByUsername || null;
   await DB.put("approvals", alert);
 
   const row = await DB.get("inventory", alert.ingredient);
