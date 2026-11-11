@@ -2,7 +2,7 @@
 
 Database: **`bloom_brew_pos`** (MySQL / MariaDB 10.4, XAMPP) · Notation: **Crow's Foot** · Normalized to **3NF**
 
-Files: [`schema.sql`](schema.sql) (tables, keys, constraints) · [`sample_data.sql`](sample_data.sql) (sample records)
+Files: [`schema.sql`](schema.sql) (tables, keys, constraints) · [`bloom_and_brew_sample_data.sql`](bloom_and_brew_sample_data.sql) (sample records)
 
 ---
 
@@ -297,7 +297,7 @@ UNIQUE (order_id, menu_item_id, variant)
 
 ## 8. Sample records
 
-[`sample_data.sql`](sample_data.sql) loads at least five records into every major table:
+[`bloom_and_brew_sample_data.sql`](bloom_and_brew_sample_data.sql) loads at least five records into every major table:
 
 | Table | Records | Notes |
 |---|---|---|
@@ -317,7 +317,7 @@ Load it after the schema (this replaces everything in the database):
 
 ```
 C:\xampp\mysql\bin\mysql.exe -u root < database\schema.sql
-C:\xampp\mysql\bin\mysql.exe -u root < database\sample_data.sql
+C:\xampp\mysql\bin\mysql.exe -u root < database\bloom_and_brew_sample_data.sql
 ```
 
 Sample logins: cashiers `nicole`, `jdelacruz`, `msantos` (password `cashier123`); managers `manager`, `rreyes` (password `manager123`).
